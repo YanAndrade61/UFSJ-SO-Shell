@@ -10,6 +10,16 @@
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
+int get_fd(char *path, char *mode)
+{
+    FILE *fp = fopen(path, mode);
+
+    if (fp == NULL)
+        return -1;
+
+    return fileno(fp);
+}
+
 void prompt()
 {
 
@@ -42,11 +52,12 @@ char *readInput(int *background)
     return buffer;
 }
 
-char ***splitInput(char *cmd, int *cmd_qtd)
+char ***splitInput(char *cmd, int *cmd_qtd, int fd_redirect[])
 {
 
     char ***commands = (char ***)calloc(sizeof(char **), MAX_CMD);
     char **tokens = (char **)calloc(sizeof(char *), MAX_CMD_SIZE);
+    // char **redir = (char **)calloc(sizeof(char *), 2);
     char *token;
     int index_cmd = 0, i;
 
@@ -79,18 +90,42 @@ char ***splitInput(char *cmd, int *cmd_qtd)
             token = strtok(NULL, " ");
         }
         commands[index][i] = NULL;
+
+        if (i >= 2 && index == index_cmd - 1 && strcmp(commands[index][i - 2], "=>") == 0)
+        {
+            fd_redirect[1] = get_fd(commands[index][i - 1], "w");
+            if (fd_redirect[1] == -1)
+            {
+                perror("get_fd() error()");
+            }
+            commands[index][i - 2] = NULL;
+            i -= 2;
+        }
+        if (i >= 2 && index == 0 && strcmp(commands[index][i - 2], "<=") == 0)
+        {
+            fd_redirect[0] = get_fd(commands[index][i - 1], "r");
+            if (fd_redirect[0] == -1)
+            {
+                perror("get_fd() error()");
+            }
+            commands[index][i - 2] = NULL;
+            i -= 2;
+        }
     }
 
     return commands;
 }
 
-void execute_commands(char ***commands, int num_cmd, int background)
+void execute_commands(char ***commands, int num_cmd, int fd_redirect[], int background)
 {
 
     int fd[2];
     pid_t pid, pid_bg;
     int fd_in = STDIN_FILENO;
-
+    if (fd_redirect[0] != -1)
+    {
+        fd_in = fd_redirect[0];
+    }
     pid_bg = fork();
     if (pid_bg == 0)
     {
@@ -110,6 +145,10 @@ void execute_commands(char ***commands, int num_cmd, int background)
                 if (i < num_cmd - 1)
                 {
                     dup2(fd[1], STDOUT_FILENO);
+                }
+                else if (fd_redirect[1] != -1)
+                {
+                    dup2(fd_redirect[1], STDOUT_FILENO);
                 }
                 close(fd[0]);
                 execvp(commands[i][0], commands[i]);
@@ -135,6 +174,7 @@ int main()
 {
     char *cmd;
     char ***args;
+    int fd_redirect[2];
     int cmd_qtd, background;
     pid_t p;
 
@@ -144,6 +184,8 @@ int main()
 
         prompt();
         background = 0;
+        memset(fd_redirect, -1, sizeof(int) * 2);
+
         cmd = readInput(&background);
 
         if (strcmp(cmd, "\n") < 1)
@@ -152,9 +194,10 @@ int main()
             continue;
         }
 
-        args = splitInput(cmd, &cmd_qtd);
+        args = splitInput(cmd, &cmd_qtd, fd_redirect);
 
-        execute_commands(args, cmd_qtd, background);
+        execute_commands(args, cmd_qtd, fd_redirect, background);
+
         for (int i = 0; i < cmd_qtd; i++)
         {
             free(args[i]);
