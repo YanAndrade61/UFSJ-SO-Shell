@@ -4,14 +4,15 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #define MAX_CMD 1000
 #define MAX_CMD_SIZE 1000
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
-int get_fd(char *path, char *mode)
-{
+int get_fd(char *path, char *mode){
     FILE *fp = fopen(path, mode);
 
     if (fp == NULL)
@@ -23,14 +24,14 @@ int get_fd(char *path, char *mode)
 void prompt()
 {
 
-    char cwd[MAX_CMD];
-    if (getcwd(cwd, MAX_CMD) == NULL)
-    {
+    char cwd[1024];
+    if (getcwd(cwd, 1024) == NULL){
         perror("getcwd() error()");
     }
     else
     {
-        printf(ANSI_COLOR_RED "%s" ANSI_COLOR_RESET " $ ", cwd);
+        printf(ANSI_COLOR_RED "Dir: %s\n" ANSI_COLOR_RESET, cwd);
+        printf("$ ");
     }
 }
 

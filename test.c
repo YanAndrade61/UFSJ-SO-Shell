@@ -1,14 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 int main()
 {
 
-    FILE *fp = fopen(NULL, "w");
+    char cwd[100];
 
-    if (fp != NULL)
-        printf("1");
-    else
-        printf("0");
-
+    if(1)
+        perror("yan");
+    printf("yan");
     return 0;
 }
