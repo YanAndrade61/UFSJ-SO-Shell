@@ -23,34 +23,37 @@ int get_fd(char *path, char *mode){
 
 void prompt()
 {
-
     char cwd[1024];
-    if (getcwd(cwd, 1024) == NULL){
+    if (getcwd(cwd, sizeof(cwd)) == NULL){
         perror("getcwd() error()");
     }
-    else
-    {
+    else{
         printf(ANSI_COLOR_RED "Dir: %s\n" ANSI_COLOR_RESET, cwd);
-        printf("$ ");
     }
 }
 
-char *readInput(int *background)
-{
+/*Function to read input and generate an history*/
+int readInput(char* cmd, int *background){
 
-    char *buffer = (char *)calloc(sizeof(char), MAX_CMD);
+    char *buffer;
+    
+    buffer = readline("$ ");
 
-    fgets(buffer, MAX_CMD, stdin);
+    //Command line is empty
+    if(strlen(buffer) < 1){
+        return 1;
+    }
 
-    buffer[strlen(buffer) - 1] = '\0';
-
-    if (buffer[strlen(buffer) - 1] == '&')
-    {
+    //Check if the command will run in background
+    if (buffer[strlen(buffer) - 1] == '&'){
         *background = 1;
         buffer[strlen(buffer) - 1] = '\0';
     }
+    
+    add_history(buffer);
+    strcpy(cmd,buffer);
 
-    return buffer;
+    return 0;
 }
 
 char ***splitInput(char *cmd, int *cmd_qtd, int fd_redirect[])
@@ -173,7 +176,7 @@ void execute_commands(char ***commands, int num_cmd, int fd_redirect[], int back
 
 int main()
 {
-    char *cmd;
+    char cmd[MAX_CMD];
     char ***args;
     int fd_redirect[2];
     int cmd_qtd, background;
@@ -187,11 +190,7 @@ int main()
         background = 0;
         memset(fd_redirect, -1, sizeof(int) * 2);
 
-        cmd = readInput(&background);
-
-        if (strcmp(cmd, "\n") < 1)
-        {
-            free(cmd);
+        if(readInput(cmd, &background)){
             continue;
         }
 
@@ -204,7 +203,7 @@ int main()
             free(args[i]);
         }
         free(args);
-        free(cmd);
+        // free(cmd);
     }
 
     return 0;
