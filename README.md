@@ -2,6 +2,8 @@
 
 Este é um shell personalizado que suporta a execução de comandos internos e externos e oferece recursos como história de comandos, execução de comandos em segundo plano, redirecionamento de entrada e saída, e tubulação. 
 
+![alt text](img/shell.png)
+
 ## Instalação
 
 Para usar o shell, é preciso instalar a biblioteca readline, que adiciona funcionalidades de histórico. Use o comando para instalar.:
