@@ -7,10 +7,12 @@
 int main()
 {
 
-    char cwd[100];
+    int c = 4;
+    char buf[100];
+    while(1){
 
-    if(1)
-        perror("yan");
-    printf("yan");
+        fgets(buf,100,stdin);
+        if(buf[0] == (char)c)break;
+    }
     return 0;
 }

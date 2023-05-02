@@ -41,7 +41,11 @@ int readInput(char* cmd, int *background){
     
     buffer = readline("$ ");
 
-    //Command line is empty
+    //Receive a crtl+d signal
+    if(!buffer){
+        return 2;
+    }
+    //Receive an empty string
     if(strlen(buffer) < 1){
         return 1;
     }
@@ -194,7 +198,7 @@ int main()
     char cmd_line[MAX_CMD];
     char ***commands;
     int fd_redirect[2];
-    int cmd_qtd, background;
+    int cmd_qtd, background, read_sig;
     pid_t p;
 
     system("clear");
@@ -206,7 +210,13 @@ int main()
         background = 0;
         memset(fd_redirect, -1, sizeof(int) * 2);
 
-        if(readInput(cmd_line, &background)){
+        read_sig = readInput(cmd_line, &background);
+        //Receive a ctrl+d signal
+        if(read_sig == 2){
+            exit(0);
+        }
+        //Just an empty input
+        if(read_sig == 1){
             continue;
         }
 
