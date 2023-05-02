@@ -2,16 +2,23 @@
 
 Este é um shell personalizado que suporta a execução de comandos internos e externos e oferece recursos como história de comandos, execução de comandos em segundo plano, redirecionamento de entrada e saída, e tubulação. 
 
+## Instalação
+
+Para usar o shell, é preciso instalar a biblioteca readline, que adiciona funcionalidades de histórico. Use o comando para instalar.:
+```
+sudo apt-get install libreadline-dev  
+```
+
 ## Como usar
 
-1. Compile o código com o seguinte comando:
+1. Compile o código com o comando:
 ```
 make
 ```
 
-2. Execute o arquivo gerado com o seguinte comando:
+2. Execute o arquivo gerado com o comando:
 ```
-./shellso
+./shellso commands_file <optional>
 ```
 
 3. Digite os comandos desejados no prompt. Você pode usar a tecla de seta para cima e para baixo para navegar pela história de comandos.
