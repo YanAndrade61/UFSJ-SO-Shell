@@ -12,6 +12,7 @@
 #define ANSI_COLOR_RED "\x1b[31m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
+/*Get file descriptor of an file*/
 int get_fd(char *path, char *mode){
     FILE *fp = fopen(path, mode);
 
@@ -21,6 +22,7 @@ int get_fd(char *path, char *mode){
     return fileno(fp);
 }
 
+/*Print the prompt (dir name)*/
 void prompt()
 {
     char cwd[1024];
@@ -52,71 +54,66 @@ int readInput(char* cmd, int *background){
     
     add_history(buffer);
     strcpy(cmd,buffer);
-
+    free(buffer);
     return 0;
 }
 
-char ***splitInput(char *cmd, int *cmd_qtd, int fd_redirect[])
+/*Process the cmd line, separating each command and their args*/
+char ***processInput(char *cmd, int *cmd_qtd, int fd_redirect[])
 {
 
     char ***commands = (char ***)calloc(sizeof(char **), MAX_CMD);
     char **tokens = (char **)calloc(sizeof(char *), MAX_CMD_SIZE);
-    // char **redir = (char **)calloc(sizeof(char *), 2);
     char *token;
-    int index_cmd = 0, i;
+    int i;
 
+    //Get each commands in line separated by pipe
     token = strtok(cmd, "|");
-
-    for (i = 0; i < MAX_CMD; i++)
+    for (i = 0; i < MAX_CMD && token != NULL; i++)
     {
-        if (token == NULL)
-        {
-            break;
-        }
-        if (strlen(token) == 0)
-        {
+        if (strlen(token) == 0){
             i--;
         }
-        tokens[i] = token;
-        index_cmd++;
+        else{
+            tokens[i] = token;
+        }       
         token = strtok(NULL, "|");
     }
-    *cmd_qtd = index_cmd;
+    *cmd_qtd = i;
+    
+    for (int index = 0; index < *cmd_qtd; index++){
 
-    for (int index = 0; index < index_cmd; index++)
-    {
-
+        //Get each command args separated by space
         token = strtok(tokens[index], " ");
         commands[index] = (char **)calloc(sizeof(char *), MAX_CMD_SIZE);
-        for (i = 0; token != NULL; i++)
-        {
+        for (i = 0; i < MAX_CMD_SIZE && token != NULL; i++){
             commands[index][i] = token;
             token = strtok(NULL, " ");
         }
         commands[index][i] = NULL;
 
-        if (i >= 2 && index == index_cmd - 1 && strcmp(commands[index][i - 2], "=>") == 0)
+        //Check if that is an out redirect in last command
+        if (i >= 2 && index == *cmd_qtd - 1 && strcmp(commands[index][i - 2], "=>") == 0)
         {
             fd_redirect[1] = get_fd(commands[index][i - 1], "w");
-            if (fd_redirect[1] == -1)
-            {
+            if (fd_redirect[1] == -1){
                 perror("get_fd() error()");
             }
             commands[index][i - 2] = NULL;
             i -= 2;
         }
+
+        //Check if that is an in redirect in first command
         if (i >= 2 && index == 0 && strcmp(commands[index][i - 2], "<=") == 0)
         {
             fd_redirect[0] = get_fd(commands[index][i - 1], "r");
-            if (fd_redirect[0] == -1)
-            {
+            if (fd_redirect[0] == -1){
                 perror("get_fd() error()");
             }
             commands[index][i - 2] = NULL;
-            i -= 2;
         }
     }
-
+    free(tokens);
     return commands;
 }
 
@@ -124,38 +121,42 @@ void execute_commands(char ***commands, int num_cmd, int fd_redirect[], int back
 {
 
     int fd[2];
+    int status;
     pid_t pid, pid_bg;
     int fd_in = STDIN_FILENO;
-    if (fd_redirect[0] != -1)
-    {
+    
+    //Redirect in of first command
+    if (fd_redirect[0] != -1){
         fd_in = fd_redirect[0];
     }
-    pid_bg = fork();
-    if (pid_bg == 0)
-    {
-        for (int i = 0; i < num_cmd; i++)
-        {
+
+    //Generate a fork to execute in background
+    if ((pid_bg = fork()) == -1){
+            perror("fork() erro()");
+            exit(1);
+    }
+    if (pid_bg == 0){
+        for (int i = 0; i < num_cmd; i++){
 
             pipe(fd);
 
-            if ((pid = fork()) == -1)
-            {
+            if ((pid = fork()) == -1){
                 perror("fork() erro()");
                 exit(1);
             }
-            if (pid == 0)
-            {
+            if (pid == 0){
                 dup2(fd_in, STDIN_FILENO);
-                if (i < num_cmd - 1)
-                {
+                if (i < num_cmd - 1){
                     dup2(fd[1], STDOUT_FILENO);
                 }
-                else if (fd_redirect[1] != -1)
-                {
+                else if (fd_redirect[1] != -1){
                     dup2(fd_redirect[1], STDOUT_FILENO);
                 }
                 close(fd[0]);
-                execvp(commands[i][0], commands[i]);
+                if(execvp(commands[i][0], commands[i]) < 0){
+                    printf("\nError command %s",commands[i][0]);
+                    exit(1);
+                }
             }
             else
             {
@@ -164,20 +165,34 @@ void execute_commands(char ***commands, int num_cmd, int fd_redirect[], int back
                 fd_in = fd[0];
             }
         }
+        exit(0);
     }
-    else
-    {
-        if (!background)
-        {
-            wait(NULL);
+    else{
+        if (background == 0){
+            waitpid(pid_bg, &status, 0);
         }
     }
 }
 
+/*Execute builtin commands or return 0 if its not a builtin*/
+int builtinCommands(char ***commands){
+
+    if(strcmp(commands[0][0],"cd") == 0){
+        chdir(commands[0][1]);
+        return 1;
+    }
+    if(strcmp(commands[0][0],"fim") == 0){
+        printf("See you later!\n");
+        exit(0);
+    }
+
+    return 0;
+}
+
 int main()
 {
-    char cmd[MAX_CMD];
-    char ***args;
+    char cmd_line[MAX_CMD];
+    char ***commands;
     int fd_redirect[2];
     int cmd_qtd, background;
     pid_t p;
@@ -185,24 +200,29 @@ int main()
     system("clear");
     while (1)
     {
-
         prompt();
+        
+        //For default background and redirected are deactivate
         background = 0;
         memset(fd_redirect, -1, sizeof(int) * 2);
 
-        if(readInput(cmd, &background)){
+        if(readInput(cmd_line, &background)){
             continue;
         }
 
-        args = splitInput(cmd, &cmd_qtd, fd_redirect);
+        commands = processInput(cmd_line, &cmd_qtd, fd_redirect);
 
-        execute_commands(args, cmd_qtd, fd_redirect, background);
+        if(builtinCommands(commands)){
+            continue;
+        }
+
+        execute_commands(commands, cmd_qtd, fd_redirect, background);
 
         for (int i = 0; i < cmd_qtd; i++)
         {
-            free(args[i]);
+            free(commands[i]);
         }
-        free(args);
+        free(commands);
         // free(cmd);
     }
 
