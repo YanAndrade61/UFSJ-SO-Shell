@@ -170,7 +170,16 @@ void execute_commands(char ***commands, int num_cmd, int fd_redirect[], int back
 int builtinCommands(char ***commands){
 
     if(strcmp(commands[0][0],"cd") == 0){
-        chdir(commands[0][1]);
+        const char *path = commands[0][1];
+        if(path == NULL){
+            path = getenv("HOME");
+            if(path == NULL){
+                path = "/";
+            }
+        }
+        if(chdir(path) != 0){
+            perror("cd");
+        }
         return 1;
     }
     if(strcmp(commands[0][0],"fim") == 0){
